@@ -194,9 +194,9 @@ def test_solver():
   problem = Problem(blocks, board)
   problem.print_ans()
 
-  board = Board.random_board(2, 4, 4, 16)
+  board = Board.random_board(2, 5, 4, 20)
   board.print()
-  problems = ProblemSet.make_from_board(board, alls, 4)
+  problems = ProblemBoard.make_from_board(board, alls, 5)
   print("FIND : ", problems.len())
   problems.print_one()
 
