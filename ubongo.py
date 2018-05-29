@@ -2,209 +2,8 @@ import numpy as np
 import pickle
 from itertools import permutations, chain, combinations
 
-def uniq_by(f, ns):
-  mapped = iter(sorted(map(lambda n : (f(n), n), ns)))
-  hd = next(mapped, None)
-  if hd == None: return hd[1]
-  prev = hd[0]
-  res = [hd[1]]
-  for fn, n in mapped:
-    if prev != fn: res.append(n)
-    prev = fn
-  return res
-assert uniq_by(lambda x : x % 2, [3,4,1,2]) == [2, 1]
-
-class NpUtils:
-  X = 2
-  Y = 1
-  Z = 0
-
-  @staticmethod
-  def zeros(shape):
-    return np.zeros(shape, dtype=np.int)
-
-  @classmethod
-  def rotX(cls, block):
-    return np.flip(np.swapaxes(block, cls.Y, cls.Z), cls.Z)
-
-  @classmethod
-  def rotY(cls, block):
-    return np.flip(np.swapaxes(block, cls.Z, cls.X), cls.X)
-
-  @classmethod
-  def rotZ(cls, block):
-    return np.flip(np.swapaxes(block, cls.X, cls.Y), cls.Y)
-
-  @classmethod
-  def rotXYZ(cls, block, x, y, z):
-    res = block
-    for i in range(x): res = cls.rotX(res)
-    for i in range(y): res = cls.rotY(res)
-    for i in range(z): res = cls.rotZ(res)
-    return res
-    
-  @staticmethod
-  def lead_zero(a):
-    res = 0
-    for c in a:
-      if c == 0: res += 1
-      else: break
-    return res
-    
-  @classmethod
-  def shirnk(cls, block):
-    zz = np.amax(np.amax(block, 2), 1)
-    zy = np.amax(np.amax(block, 0), 1)
-    zx = np.amax(np.amax(block, 0), 0)
-    sz = cls.lead_zero(zz)
-    sy = cls.lead_zero(zy)
-    sx = cls.lead_zero(zx)
-    tz = cls.lead_zero(reversed(zz))
-    ty = cls.lead_zero(reversed(zy))
-    tx = cls.lead_zero(reversed(zx))
-    return block[sz:-tz, sy:-ty, sx:-tx]
-  
-  rotations = [
-    (x, y, z) for x in range(4) for y in range(4) for z in range(4)
-  ]
-
-  @classmethod
-  def expand_merginal(cls, board, num):
-    return cls.expand(board, 0, num, 0, num, 0, num)
-
-  normal_rots = [(0, y, z) for y in range(4) for z in range(4)] + \
-                [(1, 2 * y, z) for y in range(2) for z in range(4)]
-
-  @classmethod
-  def expand(cls, block, lz, rz, ly, ry, lx, rx):
-    shape = block.shape
-    block = np.concatenate((cls.zeros([shape[cls.Z], shape[cls.Y], lx]),
-                  block,
-                  cls.zeros([shape[cls.Z], shape[cls.Y], rx])), cls.X)
-    shape = block.shape
-    block = np.concatenate((cls.zeros([shape[cls.Z], ly, shape[cls.X]]),
-                  block,
-                  cls.zeros([shape[cls.Z], ry, shape[cls.X]])), cls.Y)
-    shape = block.shape
-    block = np.concatenate((cls.zeros([lz, shape[cls.Y], shape[cls.X]]),
-                  block,
-                  cls.zeros([rz, shape[cls.Y], shape[cls.X]])), cls.Z)
-    return block
-  
-  @classmethod
-  def expand_fit(cls, inner, outer):
-    boz, boy, box = outer.shape
-    blz, bly, blx = inner.shape
-    return cls.expand(inner, 0, boz - blz, 0, boy - bly, 0, box - blx)
-  
-  @classmethod
-  def connected(cls, block):
-    block = np.copy(block)
-    for z in range(len(block)):
-      for y in range(len(block[0])):
-        for x in range(len(block[0][0])):
-          if block[z][y][x] != 0:
-            cls.remove_con(block, z, y, x)
-            return np.max(block) == 0
-    return True
-
-  D6 = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
-  @classmethod
-  def remove_con(cls, block, z, y, x):
-    if 0 <= z < len(block) and 0 <= y < len(block[0]) and 0 <= x < len(block[0][0]):
-      if block[z][y][x] != 0:
-        block[z][y][x] = 0
-        for (dz, dy, dx) in cls.D6:
-          remove_con(block, z + dz, y + dy, x + dx)
-
-  normal_rots = [(0, y, z) for y in range(4) for z in range(4)] + \
-                [(1, 2 * y, z) for y in range(2) for z in range(4)]
-  @staticmethod
-  def print(block):
-    lines = [""] * len(block[0])
-    for pz in block:
-      for i, py in enumerate(pz):
-        lines[i] += "|" + "".join(format(px, "x") if px != 0 else "." for px in py)
-    for line in lines:
-      print(line)
-    print()
-
-class Block:
-  def __init__(self, block, name = ""):
-    self.name = name
-    self.block = block
-  
-  def replace(self, block):
-    return Block(block, self.name)
-  
-  def print(self):
-    NpUtils.print(self.block)
-
-  def flat(self):
-    shape = list(self.block.shape)
-    return shape + list(np.reshape(self.block, shape[NpUtils.X] * shape[NpUtils.Y] * shape[NpUtils.Z]))
-  
-  @staticmethod
-  def from_flat(flat_block, name = ""):
-    return Block(np.array(flat_block[3:]).reshape(flat_block[:3]), name)
-
-  def move(self, move):
-    z, y, x = move
-    return self.replace(np.roll(np.roll(np.roll(self.block, x, NpUtils.X), y, NpUtils.Y), z, NpUtils.Z))
-
-  def all_rots(self):
-    max_w = max(self.block.shape)
-    max_b = NpUtils.zeros([max_w, max_w, max_w])
-    e_block = self.replace(NpUtils.expand_fit(self.block, max_b))
-    rot_blocks = map(lambda r : (r, e_block.rotate(r)), NpUtils.normal_rots)
-    res = uniq_by(lambda b : b[1].flat(), rot_blocks)
-    return res
-
-  def alimnent(self):
-    sz = NpUtils.lead_zero(np.amax(np.amax(self.block, 2), 1))
-    sy = NpUtils.lead_zero(np.amax(np.amax(self.block, 0), 1))
-    sx = NpUtils.lead_zero(np.amax(np.amax(self.block, 0), 0))
-    return self.move((-sz, -sy, -sx))
-
-  def rotate(self, r):
-    return self.replace(NpUtils.rotXYZ(self.block, *r)).alimnent()
-
-  def place_all_pat(self, board):
-    rot_blocks = map(lambda b : b[1], self.all_rots())
-    e_blocks = map(lambda b : b.replace(NpUtils.expand_fit(b.block, board.board)), rot_blocks)
-    res = {}
-    width = board.expanded
-    for block in e_blocks:
-      for x in range(width): 
-        for y in range(width):
-          for z in range(width):
-            move = (z, y, x)
-            p = board.place(block, move)
-            if p != None: res[(block, move)] = p
-    return res # [roted_block, rot)] = board
-
-class BlockList:
-  def __init__(self, blocks):
-    self.blocks = blocks
-
-  @staticmethod
-  def all_pattern(ls, counts):
-    res = []
-    prod = np.prod(ls)
-    for com in chain.from_iterable(
-      map((lambda x: combinations(range(prod),x)), counts)):
-      raw = NpUtils.zeros([prod])
-      raw[com,] = 1
-      raw = raw.reshape(ls)
-      if NpUtils.connected(raw):
-        res.extend(Block(raw).all_rot())
-
-    res = uniq_by(lambda x : x.flat(), res)
-    return res
-
-  @staticmethod
-  def random_blocks(num):
-    return [self.blocks[i] for i in np.random.choice(range(len(all_blocks)), num, False)]
+from nputils import NpUtils
+from blocks import Block, BlockList, BlockCount, all_blocks
 
 class Board:
   @staticmethod
@@ -213,6 +12,7 @@ class Board:
 
   @staticmethod
   def from_3d(board):
+    board = np.array(board)
     shape = np.shape(board)
     expanded = np.max(shape)
     board = NpUtils.expand_merginal(board, expanded)
@@ -232,18 +32,26 @@ class Board:
       return self.replace(res)
     else: return None
 
-  @staticmethod
-  def random_map(z, y, x, num):
+  @classmethod
+  def random_board(cls, z, y, x, num, tries = 10000):
     assert y * x >= num / z
-    while True:
-      res = zeros(y * x)
+    assert num % z == 0
+    ok = False
+    for i in range(tries):
+      res = NpUtils.zeros(y * x)
       res[np.random.choice(range(y * x), num // z, False),] = 1
       if NpUtils.connected(res.reshape([1, y, x])):
+        ok = True
         break
-    return np.tile(res, z).reshape([z, y, x])
+    if ok: return cls.from_3d(np.tile(res, z).reshape([z, y, x]))
+    raise RuntimeError("Too small tries.")
+    
   
   def print(self):
     NpUtils.print(self.board)
+
+  def count(self):
+    return np.sum(self.board)
 
 class Answers:
   def __init__(self, answers = []):
@@ -272,6 +80,13 @@ class Answers:
     for d in self.dump():
       NpUtils.print(d)
 
+  def has_answer(self):
+    return len(self.answers) > 0
+
+  def print_one(self):
+    assert self.has_answer()
+    NpUtils.print(next(self.dump()))
+
 class Problem:
   def __init__(self, blocks, board):
     self.blocks = blocks
@@ -280,7 +95,13 @@ class Problem:
   def pre_place_blocks(self):
     self.blocks_moves = {}
     for block in self.blocks.blocks:
-      self.blocks_moves[block] = block.place_all_pat(self.board)
+      self.blocks_moves[block.name] = block.place_all_pat(self.board)
+  
+  @staticmethod
+  def from_block_count(block_list, board, all_block):
+    res = Problem(block_list, board)
+    res.blocks_moves = all_block.placeable
+    return res
 
   def search_space(self):
     return dict((block, len(pats)) for block, pats in self.blocks_moves.items())
@@ -293,43 +114,54 @@ class Problem:
       for (block, move) in moves:
         block.move(move).print()
 
-  def place_blocks(self):
-    return self.place_blocks_(self.board, list(self.blocks_moves.items()))
+  def placeable_check(self):
+    block_sum = self.blocks.count()
+    board_sum = self.board.count()
+    return block_sum == board_sum, (block_sum, board_sum)
 
-  def place_blocks_(self, board, blocks_moves):
-    if blocks_moves == []:
+  def place_blocks(self, one = True):
+    ok, counts = self.placeable_check()
+    if not ok:
+      print("Check Count  block:%n board:%n" % counts)
+      return Answer([])
+    return self.place_blocks_(one, self.board, self.blocks.blocks)
+
+  def place_blocks_(self, one, board, blocks):
+    if blocks == []:
       assert np.min(board) != 0 # Confict
       assert np.max(board) != 0 # Remain space
       return Answers([[]]) # Placed
-
-    orig_block, block_moves = blocks_moves[0]
+    
+    block_moves = self.blocks_moves[blocks[0].name]
 
     res = Answers([])
     for (block, move) in block_moves:
       placed = board.place(block, move)
       if placed != None:
-        anss = self.place_blocks_(placed, blocks_moves[1:])
+        anss = self.place_blocks_(one, placed, blocks[1:])
         res.extend(anss.push_all((block, move)))
+        if one and res.has_answer(): return res
     return res
 
   @staticmethod
-  def make_problem(blocks, board, num, max_counts):
-    board_sum = np.sum(board)
-    res = []
-    e_board, all_moves = pre_place(board, blocks, 5)
-    res_counts = 0
-    for select in combinations(all_moves, num):
-      select_moves = [s[0] for s in select]
-      counts = np.sum([s[1][0] for s in select])
-      if counts == board_sum:
-        result = place_all(e_board, select_moves)
-        if len(result) != 0:
-          res += [([s[1] for s in select], result)]
-          print("FIND")
-          res_counts += 1
-          if res_counts >= max_counts:
-            return res
-    return res
+  def make_from_board(board, block_count, block_num):
+    board_count = board.count()
+    block_count.calc_placeable(board)
+
+    print("ST e")
+    for blocks in block_count.all_comb_from_board(board, block_num):
+      print(list(b.name for b in blocks.blocks))
+      assert board_count == blocks.count()
+      problem = Problem.from_block_count(blocks, board, block_count)
+      ans = problem.place_blocks()
+      if ans.has_answer():
+        return problem
+    print("END")
+    return None
+  
+  def print(self):
+    self.board.print()
+    self.blocks.print()
 
 class ProblemSet:
   def __init__(self, problems):
@@ -389,148 +221,28 @@ def calc_max_parts(blocks):
     res[b] = n
   return res
 
-bv = Block(np.array([
-  [[1, 1, 0],
-   [1, 0, 0]],
-  [[0, 0, 0],
-   [0, 0, 0]],
-]),"V")
-bl = Block(np.array([
-  [[1, 1, 1],
-   [1, 0, 0]],
-  [[0, 0, 0],
-   [0, 0, 0]],
-]),"L")
-bu = Block(np.array([
-  [[1, 1, 1],
-   [1, 0, 1]],
-  [[0, 0, 0],
-   [0, 0, 0]],
-]),"U")
+def test_solver():
+  alls = all_blocks()
 
-sampleblock = BlockList([bv, bl, bu])
-sampleboard = Board.from_3d(np.array([
-  [[1, 1, 1],
-   [1, 1, 1]],
-  [[1, 1, 1],
-   [1, 1, 1]]
-]))
+  board = Board.random_board(2, 2, 4, 16)
+  board.print()
+  blocks = alls.get_blocklist().sublist(["BV", "BV", "BP", "BP"])
+  problem = Problem(blocks, board)
+  problem.pre_place_blocks()
+  print(problem.search_space())
+  ans = problem.place_blocks()
+  ans.print_one()
 
-sampleproblem = Problem(sampleblock, sampleboard)
-sampleproblem.pre_place_blocks()
-# print(sampleproblem.search_space())
-# sampleproblem.print_space()
-# sampleboard.print()
-ans = sampleproblem.place_blocks()
-ans.print()
+  board = Board.random_board(2, 4, 4, 16)
+  board.print()
+  problem = Problem.make_from_board(board, alls, 4)
+  problem.print()
+  problem.pre_place_blocks()
+  problem.place_blocks().print_one()
 
-# for view in p_view:
-#   print_block(view)
-# 
-# all_parts = all_pattern([2,3,2], [5])
-# for parts in all_parts:
-#   print_block(parts)
-# print(len(all_parts))
-# 
-# all_blocks = [
-# (
-# [[[1, 1, 1],
-#   [0, 1, 0]],
-#  [[1, 0, 0],
-#   [0, 0, 0]]]
-#   , 2, "YT"
-# ),(
-# [[[1, 1, 1],
-#   [1, 0, 0]],
-#  [[0, 0, 1],
-#   [0, 0, 0]]]
-#   , 2, "YL"
-# ),(
-# [[[1, 1, 0],
-#   [0, 1, 0]],
-#  [[0, 0, 0],
-#   [0, 1, 0]]]
-#   , 3, "YV"
-# ),(
-# [[[1, 1, 1],
-#   [1, 0, 1]],
-#  [[0, 0, 0],
-#   [0, 0, 0]]]
-#   , 2, "YU"
-# ),(
-# [[[1, 1, 1],
-#   [0, 0, 1]],
-#  [[0, 0, 0],
-#   [0, 0, 1]]]
-#   , 2, "BL"
-# ),(
-# [[[0, 1, 1],
-#   [1, 1, 0]],
-#  [[0, 0, 0],
-#   [1, 0, 0]]]
-#   , 2, "BS"
-# ),(
-# [[[1, 1, 1],
-#   [0, 1, 1]],
-#  [[0, 0, 0],
-#   [0, 0, 0]]]
-#   , 3, "BP"
-# ),(
-# [[[1, 1, 0],
-#   [1, 0, 0]],
-#  [[0, 0, 0],
-#   [0, 0, 0]]]
-#   , 4, "BV"
-# ),(
-# [[[1, 1, 0],
-#   [1, 1, 0]],
-#  [[1, 0, 0],
-#   [0, 0, 0]]]
-#   , 3, "RO"
-# ),(
-# [[[1, 1, 0],
-#   [1, 0, 0]],
-#  [[0, 0, 0],
-#   [1, 0, 0]]]
-#   , 3, "RV"
-# ),(
-# [[[1, 1, 1],
-#   [0, 0, 1]],
-#  [[1, 0, 0],
-#   [0, 0, 0]]]
-#   , 2, "RL"
-# ),(
-# [[[0, 1, 1],
-#   [1, 1, 0]],
-#  [[0, 0, 0],
-#   [0, 0, 0]]]
-#   , 2, "RZ"
-# ),(
-# [[[1, 1, 0],
-#   [0, 1, 1]],
-#  [[1, 0, 0],
-#   [0, 0, 0]]]
-#   , 2, "GS"
-# ),(
-# [[[1, 1, 1],
-#   [1, 0, 0]],
-#  [[0, 0, 0],
-#   [1, 0, 0]]]
-#   , 2, "GL"
-# ),(
-# [[[1, 1, 1],
-#   [0, 1, 0]],
-#  [[0, 0, 0],
-#   [0, 0, 0]]]
-#   , 2, "GT"
-# ),(
-# [[[1, 1, 1],
-#   [0, 0, 1]],
-#  [[0, 0, 0],
-#   [0, 0, 0]]]
-#   , 4, "GJ"
-# )]
-# 
+if __name__ == '__main__':
+  test_solver()
+
 # problems = [[
 #   ["GLBPBVRO", "ROGJYTRZ", "GSYVRORV", "GLRVROGJ", "YVGJYTRO"],
 #   ["GJYVBVGL", "BVGTBLGJ", "BVRLYVRZ", "GJRZYTBV", "BLBVRVGJ"],
