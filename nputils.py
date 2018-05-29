@@ -94,14 +94,28 @@ class NpUtils:
             return np.max(block) == 0
     return True
 
+  def min_connected(board):
+    board = np.copy(board)
+    min_con = 1000000
+    for z in range(len(board)):
+      for y in range(len(board[0])):
+        for x in range(len(board[0][0])):
+          if board[z][y][x] != 0:
+            con = NpUtils.remove_con(board, z, y, x)
+            if con < min_con: min_con = con
+    return min_con
+
   D6 = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
   @staticmethod
   def remove_con(block, z, y, x):
+    res = 0
     if 0 <= z < len(block) and 0 <= y < len(block[0]) and 0 <= x < len(block[0][0]):
       if block[z][y][x] != 0:
         block[z][y][x] = 0
+        res += 1
         for (dz, dy, dx) in NpUtils.D6:
-          NpUtils.remove_con(block, z + dz, y + dy, x + dx)
+          res += NpUtils.remove_con(block, z + dz, y + dy, x + dx)
+    return res
 
   normal_rots = [(0, y, z) for y in range(4) for z in range(4)] + \
                 [(1, 2 * y, z) for y in range(2) for z in range(4)]

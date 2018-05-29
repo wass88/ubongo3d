@@ -59,7 +59,7 @@ class Block:
   def rotate(self, r):
     return self.replace(NpUtils.rotXYZ(self.block, *r)).alimnent()
 
-  def place_all_pat(self, board):
+  def place_all_pat(self, board, remain_min = 0):
     rot_blocks = map(lambda b : b[1], self.all_rots())
     e_blocks = map(lambda b : b.replace(NpUtils.expand_fit(b.block, board.board)), rot_blocks)
     res = {}
@@ -70,7 +70,8 @@ class Block:
           for z in range(width):
             move = (z, y, x)
             p = board.place(block, move)
-            if p != None: res[(block, move)] = p
+            if p != None and p.min_connected() >= remain_min:
+              res[(block, move)] = p
     return res # [(roted_block, rot)] = board
   
   def count(self):

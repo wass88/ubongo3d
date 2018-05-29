@@ -1,9 +1,10 @@
 import numpy as np
-import pickle
 from itertools import permutations, chain, combinations
 
 from nputils import NpUtils
 from blocks import Block, BlockList, BlockCount, all_blocks
+
+from pickleutil import PickleUtil
 
 class Board:
   @staticmethod
@@ -45,8 +46,10 @@ class Board:
         break
     if ok: return cls.from_3d(np.tile(res, z).reshape([z, y, x]))
     raise RuntimeError("Too small tries.")
+
+  def min_connected(self):
+    return NpUtils.min_connected(self.board)
     
-  
   def print(self):
     NpUtils.print(self.board)
 
@@ -92,10 +95,10 @@ class Problem:
     self.blocks = blocks
     self.board = board
 
-  def pre_place_blocks(self):
+  def pre_place_blocks(self, remain_min = 3):
     self.blocks_moves = {}
     for block in self.blocks.blocks:
-      self.blocks_moves[block.name] = block.place_all_pat(self.board)
+      self.blocks_moves[block.name] = block.place_all_pat(self.board, remain_min)
   
   @staticmethod
   def from_block_count(block_list, board, all_block):
@@ -143,84 +146,45 @@ class Problem:
         if one and res.has_answer(): return res
     return res
 
+  def print(self):
+    self.board.print()
+    self.blocks.print()
+  
+  def print_ans(self):
+    self.pre_place_blocks()
+    self.place_blocks().print_one()
+
+class ProblemBoard:
+  def __init__(self, board, problems):
+    self.board = board
+    self.problems = problems
+
   @staticmethod
-  def make_from_board(board, block_count, block_num):
+  def make_from_board(board, block_count, block_num, one = False):
     board_count = board.count()
     block_count.calc_placeable(board)
 
-    print("ST e")
+    res = []
     for blocks in block_count.all_comb_from_board(board, block_num):
       print(list(b.name for b in blocks.blocks))
       assert board_count == blocks.count()
       problem = Problem.from_block_count(blocks, board, block_count)
       ans = problem.place_blocks()
       if ans.has_answer():
-        return problem
-    print("END")
-    return None
+        print("FIND")
+        res.append(problem)
+        if one: return ProblemBoard(board, res)
+    return ProblemBoard(board, res)
+
+  def len(self):
+    return len(self.problems)
   
-  def print(self):
-    self.board.print()
-    self.blocks.print()
+  def print_one(self):
+    self.problems[0].print_ans()
 
 class ProblemSet:
-  def __init__(self, problems):
-    self.problems = problems
-
-def full_svg(svg, width = 100, height = 100):
-  return ('<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="%dpx" height="%dpx">' %
-    (width, height) +
-    svg +
-  '</svg>')
-
-def svg_board(board, size = 10, width = 2):
-  res = []
-  for by, y in enumerate(board):
-    for bx, x in enumerate(by):
-      if bx != 0:
-        res += ('<rect x="%d" y="%d" width="%d" height="%d"'
-          'fill="none" stroke="black" stroke-width="%d" />' %
-          (y * size, x * size, size, size, 2)
-        )
-  return res
-
-def read_pickle(f):
-  with open(f, mode="rb") as f:
-   return pickle.load(f)
-
-def write_pickle(res, f):
-  with open(f, mode="wb") as f:
-    pickle.dump(res, f)
-
-def print_problems(f):
-  for (r_map, result) in f:
-    if len(result) >= 0:
-      print(len(result))
-      print([[r[2] for r in br[0]] for br in result])
-      print_block(r_map)
-
-def useable_parts(exits_parts, max_parts):
-  return all((exits_parts.count(b) <= max_parts[b] for b in max_parts))
-
-def ok_problem(problem, useds, max_parts):
-  prob = []
-  for results in problem[1]:
-    prob += [[res[2] for res in results[0]]]
-  print(prob)
-  print(len(prob))
-  for used in useds:
-    ok = True
-    for pro in prob:
-      ok &= useable_parts(pro + used, max_parts)
-    if not ok : return False
-  return True
-
-def calc_max_parts(blocks):
-  res = {}
-  for (_, n, b) in blocks:
-    res[b] = n
-  return res
-
+  pass
+  
 def test_solver():
   alls = all_blocks()
 
@@ -228,77 +192,13 @@ def test_solver():
   board.print()
   blocks = alls.get_blocklist().sublist(["BV", "BV", "BP", "BP"])
   problem = Problem(blocks, board)
-  problem.pre_place_blocks()
-  print(problem.search_space())
-  ans = problem.place_blocks()
-  ans.print_one()
+  problem.print_ans()
 
   board = Board.random_board(2, 4, 4, 16)
   board.print()
-  problem = Problem.make_from_board(board, alls, 4)
-  problem.print()
-  problem.pre_place_blocks()
-  problem.place_blocks().print_one()
+  problems = ProblemSet.make_from_board(board, alls, 4)
+  print("FIND : ", problems.len())
+  problems.print_one()
 
 if __name__ == '__main__':
   test_solver()
-
-# problems = [[
-#   ["GLBPBVRO", "ROGJYTRZ", "GSYVRORV", "GLRVROGJ", "YVGJYTRO"],
-#   ["GJYVBVGL", "BVGTBLGJ", "BVRLYVRZ", "GJRZYTBV", "BLBVRVGJ"],
-#   ["YVBPBLRZ", "ROBSGTYV", "GTYLYVGL", "BVGSROYT", "GSRVRLYV"],
-#   ["YVGJROBL", "BLRORVGJ", "ROBVBLGL", "RVGJROGL", "RORLYVGJ"]
-# ]]
-# problems = [[[[p[i:i+2] for i in range(0, 8, 2)] for p in ps] for ps in prs] for prs in problems]
-# problems = [pr for prs in problems for pr in np.transpose(prs, (1, 0, 2))]
-# problems = [[p for pr in prs for p in pr] for prs in problems]
-# 
-# all_blocks = [(np.array(b[0]), b[1], b[2]) for b in all_blocks]
-# def make_puzzles(block_num, sizes, num):
-#   r_maps = []
-#   for i in range(num):
-#     r_maps += [random_map(2, 5, 3, np.random.choice(sizes))]
-# 
-#   results = []
-#   for i, r_map in enumerate(r_maps):
-#     print("Make ", i)
-#     result = make_problem(all_blocks, r_map, block_num, 100)
-#     if len(result) >= 1:
-#       select, ans = result[0]
-#       for a in viewer(ans):
-#         print_block(a)
-#       for s in select:
-#         print(s[2])
-#         print_block(s[0])
-#       print_block(r_map)
-#       print("Find Answers: ", len(result))
-# 
-#       results += [(r_map, result)]
-#   return results
-# 
-# # res = make_puzzles(5, [22, 24], 10)
-# # write_pickle(res, "5block.pickle")
-# 
-# # res :: [
-# #   ( r_map
-# #   , results
-# #     [
-# #       ( select [
-# #           ( blocks, count, name )
-# #         ]
-# #       , ans [
-# #           ( ans, blocks )
-# #         ]
-# #       )
-# #     ]
-# #   )
-# # ]
-# 
-# res = read_pickle("5block.pickle")
-# print_problems(res)
-# 
-# max_parts = calc_max_parts(all_blocks)
-# print(res[0][1])
-# for r in res:
-#   print(ok_problem(r, problems, max_parts))
-# 
