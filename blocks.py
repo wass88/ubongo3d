@@ -202,6 +202,14 @@ class BlockCount:
       counts[name] -= 1
       assert counts[name] >= 0
     return self.replace(counts)
+  
+  def is_include_list(self, blocks):
+    counts = dict(self.counts)
+    for name in blocks.names():
+      counts[name] -= 1
+    for v in counts.values():
+      if v < 0: return False
+    return True
 
   @staticmethod
   def from_block_list(blocks):

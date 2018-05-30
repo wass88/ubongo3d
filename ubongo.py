@@ -1,12 +1,14 @@
 import numpy as np
 from itertools import permutations, chain, combinations
 
-from random import choice
+from random import choice, shuffle
 from nputils import NpUtils
 from blocks import Block, BlockList, BlockCount, all_blocks
 
 from pickleutil import PickleUtil
 from svg import SVG
+
+from multiprocessing import Pool, Process
 
 class Board:
   @staticmethod
@@ -158,29 +160,41 @@ class Problem:
     self.pre_place_blocks()
     self.place_blocks().print_one()
 
+def solve(data):
+  (i, (blocks, board, block_count)) = data
+  print(i,":",list(b.name for b in blocks.blocks))
+  problem = Problem.from_block_count(blocks, board, block_count)
+  ans = problem.place_blocks()
+  if ans.has_answer():
+    print("FIND")
+    return problem
+  return None
+
 class ProblemBoard:
   def __init__(self, board, problems):
     self.board = board
     self.problems = problems
 
   @staticmethod
-  def make_from_board(board, block_count, block_num, one = False):
+  def make_from_board(board, block_count, block_num, count = 10000000, rand = False, para = False):
     board_count = board.count()
     block_count.calc_placeable(board)
 
     conds = list(block_count.all_comb_from_board(board, block_num))
+    if rand: shuffle(conds)
     print("COND : ", len(conds))
 
-    res = []
-    for i, blocks in enumerate(conds):
-      print(i,"/",len(conds),list(b.name for b in blocks.blocks))
-      assert board_count == blocks.count()
-      problem = Problem.from_block_count(blocks, board, block_count)
-      ans = problem.place_blocks()
-      if ans.has_answer():
-        print("FIND")
-        res.append(problem)
-        if one: return ProblemBoard(board, res)
+    params = enumerate(map(lambda blocks: [blocks, board, block_count], conds))
+    if para:
+      pool = Pool(8)
+      res = pool.map(solve, params)
+      res = filter(lambda x : x != None, re)
+    else:
+      res = []
+      for ib in params:
+        problem = solve(ib)
+        if problem: res.append(problem)
+        if len(res) >= count: return ProblemBoard(board, res)
 
     print("FIND : ", len(res))
     return ProblemBoard(board, res)
@@ -188,12 +202,24 @@ class ProblemBoard:
   def len(self):
     return len(self.problems)
   
+  def append(self, problem):
+    self.problems.append(problem)
+
+  def extend(self, problemb):
+    self.problems.extend(problemb.problems)
+  
+  def remove_index(self, index):
+    del self.problems[index]
+  
   def print_one(self):
     self.problems[0].print_ans()
 
 class ProblemSet:
   def __init__(self, probboards):
     self.probboards = probboards
+
+  def replace(self, probboards):
+    return ProblemSet(probboards)
 
   @staticmethod
   def make(block_count, player):
@@ -210,6 +236,37 @@ class ProblemSet:
           res.append(problemb)
           break
     return ProblemSet(res)
+
+  @staticmethod
+  def make2(block_count, player, puzzles = 4):
+    cond_c = [20, 22, 24]
+    probs = []
+    for i in range(player):
+      while True:
+        board = Board.random_board(2, 5, 4, choice(cond_c))
+        probb = ProblemBoard.make_from_board(board, block_count, 5, rand=True, para=True)
+        if probb.len() >= puzzles:
+          probs.append(probb)
+  
+  def strict(puzzles = 4):
+    probs = sorted(self.probboards, lambda p : p.len())
+    print("GET", list(map(lambda x: x.len(), probs))) 
+
+    res = [ProblemBoard(board, []) for _ in range(puzzles)]
+    for i in range(puzzles):
+      counts = block_count
+      for ib, probb in enumrate(probs.probboards()):
+        print("Make from", counts)
+        for ip, prob in enumerate(probs.problems):
+          if counts.is_include_list(prob.blocks):
+            res[ib].append(prob)
+            probs[ib].remove_index(i)
+            counts = counts.remove_list(prob.blocks)
+            break
+    return self.replace(res)
+  
+  def set_name(name):
+    self.name = name
   
 def test_solver():
   alls = all_blocks()
@@ -224,9 +281,18 @@ def test_solver():
   prob = PickleUtil.read("data/sample5")
   prob.print_ans()
 
-  probset = ProblemSet.make(alls, 5)
-  PickleUtil.write("data/5p", probset)
-  PickleUtil.read("data/5p")
+  probset = ProblemSet.make(alls, 4)
+  PickleUtil.write("data/4p4.2", probset)
+  PickleUtil.read("data/4p4.2")
+
+def make2():
+  alls = all_blocks()
+  probset = ProblemSet.make2(alls, 4)
+  PickleUtil.write("data/4p4.a", probset)
+
+  probset2 = probset.strict()
+  PickleUtil.write("data/4p4.a2", probset)
+
 
 def test_svg():
   alls = all_blocks()
@@ -236,19 +302,14 @@ def test_svg():
   problem = Problem(blocks, board)
   problem.print_ans()
 
-  svg = SVG.svg()
-  g = SVG.gtrans(3, 3)
-  g.append(SVG.board(board))
-  svg.append(g)
+  probset = PickleUtil.read("data/4p4.a")
+  print(probset)
+  html = SVG.problemset(probset)
+  html.save("data/4p4.html")
 
-  g = SVG.gtrans(6, 3)
-  blocks = alls.get_blocklist().sublist(["BV", "YV", "RV"])
-  g.append(SVG.blocklist(blocks))
-  svg.append(g)
-
-  svg.save("data/test.svg")
-  print(svg.concat())
+  #probset.probboards[2].problems[0].print_ans()
 
 if __name__ == "__main__":
   #test_solver()
+  make2()
   test_svg()
