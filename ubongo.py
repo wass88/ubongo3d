@@ -1,10 +1,12 @@
 import numpy as np
 from itertools import permutations, chain, combinations
 
+from random import choice
 from nputils import NpUtils
 from blocks import Block, BlockList, BlockCount, all_blocks
 
 from pickleutil import PickleUtil
+from svg import SVG
 
 class Board:
   @staticmethod
@@ -129,7 +131,7 @@ class Problem:
       return Answer([])
     return self.place_blocks_(one, self.board, self.blocks.blocks)
 
-  def place_blocks_(self, one, board, blocks):
+  def place_blocks_(self, one, board, blocks, rem_min = 3):
     if blocks == []:
       assert np.min(board) != 0 # Confict
       assert np.max(board) != 0 # Remain space
@@ -141,6 +143,8 @@ class Problem:
     for (block, move) in block_moves:
       placed = board.place(block, move)
       if placed != None:
+        #if len(blocks) > 1 and placed.min_connected() < rem_min:
+        #  continue
         anss = self.place_blocks_(one, placed, blocks[1:])
         res.extend(anss.push_all((block, move)))
         if one and res.has_answer(): return res
@@ -164,9 +168,12 @@ class ProblemBoard:
     board_count = board.count()
     block_count.calc_placeable(board)
 
+    conds = list(block_count.all_comb_from_board(board, block_num))
+    print("COND : ", len(conds))
+
     res = []
-    for blocks in block_count.all_comb_from_board(board, block_num):
-      print(list(b.name for b in blocks.blocks))
+    for i, blocks in enumerate(conds):
+      print(i,"/",len(conds),list(b.name for b in blocks.blocks))
       assert board_count == blocks.count()
       problem = Problem.from_block_count(blocks, board, block_count)
       ans = problem.place_blocks()
@@ -174,6 +181,8 @@ class ProblemBoard:
         print("FIND")
         res.append(problem)
         if one: return ProblemBoard(board, res)
+
+    print("FIND : ", len(res))
     return ProblemBoard(board, res)
 
   def len(self):
@@ -183,7 +192,24 @@ class ProblemBoard:
     self.problems[0].print_ans()
 
 class ProblemSet:
-  pass
+  def __init__(self, probboards):
+    self.probboards = probboards
+
+  @staticmethod
+  def make(block_count, player):
+    res = []
+    blockset = block_count.split_blocks(player)
+    for blocks in blockset:
+      while True:
+        cond_c = [20, 22, 24]
+        board = Board.random_board(2, 5, 4, choice(cond_c))
+        board.print()
+        problemb = ProblemBoard.make_from_board(board, blocks, 5)
+        if len(problemb.problems) >= 3:
+          problemb.print_one()
+          res.append(problemb)
+          break
+    return ProblemSet(res)
   
 def test_solver():
   alls = all_blocks()
@@ -194,11 +220,35 @@ def test_solver():
   problem = Problem(blocks, board)
   problem.print_ans()
 
-  board = Board.random_board(2, 5, 4, 20)
-  board.print()
-  problems = ProblemBoard.make_from_board(board, alls, 5)
-  print("FIND : ", problems.len())
-  problems.print_one()
+  PickleUtil.write("data/sample5", problem)
+  prob = PickleUtil.read("data/sample5")
+  prob.print_ans()
 
-if __name__ == '__main__':
-  test_solver()
+  probset = ProblemSet.make(alls, 5)
+  PickleUtil.write("data/5p", probset)
+  PickleUtil.read("data/5p")
+
+def test_svg():
+  alls = all_blocks()
+  board = Board.random_board(2, 2, 4, 16)
+  board.print()
+  blocks = alls.get_blocklist().sublist(["BV", "BV", "BP", "BP"])
+  problem = Problem(blocks, board)
+  problem.print_ans()
+
+  svg = SVG.svg()
+  g = SVG.gtrans(3, 3)
+  g.append(SVG.board(board))
+  svg.append(g)
+
+  g = SVG.gtrans(6, 3)
+  blocks = alls.get_blocklist().sublist(["BV", "YV", "RV"])
+  g.append(SVG.blocklist(blocks))
+  svg.append(g)
+
+  svg.save("data/test.svg")
+  print(svg.concat())
+
+if __name__ == "__main__":
+  #test_solver()
+  test_svg()

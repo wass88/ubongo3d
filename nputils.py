@@ -1,4 +1,5 @@
 import numpy as np
+import string
 
 class NpUtils:
   X = 2
@@ -121,10 +122,11 @@ class NpUtils:
                 [(1, 2 * y, z) for y in range(2) for z in range(4)]
   @staticmethod
   def print(block):
+    convDict = {int(c,32) : c for c in (string.digits+string.ascii_lowercase)[:32]}
     lines = [""] * len(block[0])
     for pz in block:
       for i, py in enumerate(pz):
-        lines[i] += "|" + "".join(format(px, "x") if px != 0 else "." for px in py)
+        lines[i] += "|" + "".join(convDict[px] if px != 0 else "." for px in py)
     for line in lines:
       print(line)
     print()

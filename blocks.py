@@ -119,6 +119,12 @@ class BlockList:
   def count(self):
     return sum(block.count() for block in self.blocks)
 
+  def names(self):
+    return list(b.name for b in self.blocks)
+
+  def blockcount(self):
+    names = self.names()
+    return {name: names.count(name) for name in set(names)}
 
 class Comb:
   @staticmethod
@@ -180,7 +186,22 @@ class BlockCount:
     self.calc_block_sum()
   
   def replace(self, other):
-    return BlockCount(self.blocks, other.counts)
+    return BlockCount(self.blocks, other)
+
+  def replace_from_list(self, blocks):
+    counts = dict(self.counts)
+    for name in counts.keys():
+      counts[name] = 0
+    for name, c in blocks.blockcount().items():
+      counts[name] = c
+    return self.replace(counts)
+
+  def remove_list(self, blocks):
+    counts = dict(self.counts)
+    for name in blocks.names():
+      counts[name] -= 1
+      assert counts[name] >= 0
+    return self.replace(counts)
 
   @staticmethod
   def from_block_list(blocks):
@@ -197,8 +218,8 @@ class BlockCount:
   def remove_list(self, list):
     counts = dict(self.counts)
     for block in list.blocks:
-      counts[block.name] -= block.name
-      assert self.counts >= 0
+      counts[block.name] -= 1
+      assert self.counts[block.name] >= 0
     return self.replace(counts)
 
   def all_comb_from_board(self, board, num):
@@ -217,6 +238,20 @@ class BlockCount:
     from ubongo import BlockList
     names = sample(self.flat_counts(), num)
     return BlockList( self.blocks[name] for name in names )
+
+  def sum(self):
+    return sum(self.counts.values())
+
+  def split_blocks(self, players):
+    num = self.sum() // players
+    sf = self
+    res = []
+    for _ in range(players):
+      r = sf.random_list(num)
+      sf = sf.remove_list(r)
+      r = self.replace_from_list(r)
+      res.append(r)
+    return res
 
   def calc_placeable(self, board):
     self.placeable = dict(
