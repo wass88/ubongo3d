@@ -6,7 +6,7 @@ class SVG:
         self.contents = []
     
     @staticmethod
-    def svg(width = 20, height = 20):
+    def svg(width = 18, height = 10):
         return SVG(
             '<svg xmlns="http://www.w3.org/2000/svg" version="1.1" \n'
                 'width="%fcm" height="%fcm">\n' % (width, height),
@@ -22,6 +22,8 @@ class SVG:
         <style>
         .cont{ 
             display: flex;
+            width: 40cm;
+            flex-wrap: wrap;
         }
         .page {
             border: 1px solid black; 
@@ -33,7 +35,7 @@ class SVG:
     
     @staticmethod
     def div(cls=""):
-        return SVG('<div cls="%s">' % cls)
+        return SVG('<div cls="%s">' % cls, '</div>')
 
     
     @staticmethod

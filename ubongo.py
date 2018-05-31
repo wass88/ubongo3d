@@ -10,6 +10,8 @@ from svg import SVG
 
 from multiprocessing import Pool, Process
 
+import datetime
+
 class Board:
   @staticmethod
   def from_2d(board, height = 2):
@@ -188,7 +190,7 @@ class ProblemBoard:
     if para:
       pool = Pool(8)
       res = pool.map(solve, params)
-      res = filter(lambda x : x != None, re)
+      res = list(filter(lambda x : x != None, res))
     else:
       res = []
       for ib in params:
@@ -238,35 +240,68 @@ class ProblemSet:
     return ProblemSet(res)
 
   @staticmethod
-  def make2(block_count, player, puzzles = 4):
-    cond_c = [20, 22, 24]
+  def make2(setting):
+    block_count = setting.block_count
+    player = setting.player
+    puzzles = setting.puzzles
+    cond_size = setting.board_nums
+
     probs = []
+
     for i in range(player):
       while True:
-        board = Board.random_board(2, 5, 4, choice(cond_c))
+        board = Board.random_board(2, setting.board_width, setting.board_height, choice(cond_size))
         probb = ProblemBoard.make_from_board(board, block_count, 5, rand=True, para=True)
         if probb.len() >= puzzles:
           probs.append(probb)
+          PickleUtil.write("data/probb_" + datetime.datetime.now().isoformat(), probb)
+          break
+    return ProblemSet(probs).strict(block_count, puzzles)
   
-  def strict(puzzles = 4):
-    probs = sorted(self.probboards, lambda p : p.len())
-    print("GET", list(map(lambda x: x.len(), probs))) 
+  def strict(self, block_count, puzzles = 5):
+    probs = sorted(self.probboards, key = lambda p : p.len())
 
-    res = [ProblemBoard(board, []) for _ in range(puzzles)]
+    # TODO: need backtruck?
+    res = [ProblemBoard(p.board, []) for p in self.probboards]
     for i in range(puzzles):
+      print(list(probb.len() for probb in probs))
       counts = block_count
-      for ib, probb in enumrate(probs.probboards()):
-        print("Make from", counts)
-        for ip, prob in enumerate(probs.problems):
+      for ib, probb in enumerate(probs):
+        for ip, prob in enumerate(probb.problems):
           if counts.is_include_list(prob.blocks):
             res[ib].append(prob)
-            probs[ib].remove_index(i)
+            probs[ib].remove_index(ip)
             counts = counts.remove_list(prob.blocks)
             break
     return self.replace(res)
-  
+    
   def set_name(name):
     self.name = name
+
+class GameSetting:
+  def __init__(self, block_count, games, player, puzzles, block_num, board_nums, board_width, board_height):
+    self.block_count = block_count
+    self.games = games
+    self.player = player
+    self.puzzles = puzzles
+    self.block_num = block_num
+    self.board_nums = board_nums
+    self.board_width = board_width
+    self.board_height = board_height
+
+class Game:
+  def __init__(self, probsets):
+    self.probsets = probsets
+
+  @staticmethod
+  def make(setting):
+    res = []
+    for i in range(setting.games):
+      print("Making: ", i)
+      s = ProblemSet.make2(setting)
+      PickleUtil.write("data/make2_"+str(i), s)
+      res.append(s)
+    return GameSet(res)
   
 def test_solver():
   alls = all_blocks()
@@ -287,12 +322,25 @@ def test_solver():
 
 def make2():
   alls = all_blocks()
-  probset = ProblemSet.make2(alls, 4)
+  #probset = ProblemSet.make2(alls, 4)
   PickleUtil.write("data/4p4.a", probset)
 
-  probset2 = probset.strict()
-  PickleUtil.write("data/4p4.a2", probset)
+  probset2 = probset.strict(alls)
+  PickleUtil.write("data/4p4.a2", probset2)
 
+def make_game():
+  setting = GameSetting(
+    block_count = all_blocks(),
+    games = 10,
+    player = 4,
+    puzzles = 4,
+    block_num = 5,
+    board_nums = [20, 22, 24],
+    board_width = 5,
+    board_height = 4
+  )
+  game = Game.make(setting)
+  PickleUtil.write("data/game4player5block", game)
 
 def test_svg():
   alls = all_blocks()
@@ -302,8 +350,8 @@ def test_svg():
   problem = Problem(blocks, board)
   problem.print_ans()
 
-  probset = PickleUtil.read("data/4p4.a")
-  print(probset)
+  probset = PickleUtil.read("data/4p4.a2")
+  print(list(probb.len() for probb in probset.probboards))
   html = SVG.problemset(probset)
   html.save("data/4p4.html")
 
@@ -311,5 +359,6 @@ def test_svg():
 
 if __name__ == "__main__":
   #test_solver()
-  make2()
+  #make2()
+  make_game()
   test_svg()
