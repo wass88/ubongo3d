@@ -185,6 +185,12 @@ class BlockCount:
     self.counts = counts
     self.calc_block_sum()
   
+  def clone(self):
+    res = BlockCount(self.blocks, self.counts)
+    if hasattr(self, 'countblocks'): res.countblocks = self.countblocks
+    if hasattr(self, 'placeable'): res.placeable = self.placeable
+    return res
+
   def replace(self, other):
     return BlockCount(self.blocks, other)
 
@@ -205,10 +211,10 @@ class BlockCount:
   
   def is_include_list(self, blocks):
     counts = dict(self.counts)
+    print(counts)
     for name in blocks.names():
       counts[name] -= 1
-    for v in counts.values():
-      if v < 0: return False
+      if counts[name] < 0: return False
     return True
 
   @staticmethod

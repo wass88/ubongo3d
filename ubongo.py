@@ -132,7 +132,7 @@ class Problem:
     ok, counts = self.placeable_check()
     if not ok:
       print("Check Count  block:%n board:%n" % counts)
-      return Answer([])
+      return Answers([])
     return self.place_blocks_(one, self.board, self.blocks.blocks)
 
   def place_blocks_(self, one, board, blocks, rem_min = 3):
@@ -178,8 +178,10 @@ class ProblemBoard:
     self.problems = problems
 
   @staticmethod
-  def make_from_board(board, block_count, block_num, count = 10000000, rand = False, para = False):
+  def make_from_board(board, block_count, block_num, count = 10000000, 
+                        rand = False, para = False, itr = False):
     board_count = board.count()
+    block_count = block_count.clone()
     block_count.calc_placeable(board)
 
     conds = list(block_count.all_comb_from_board(board, block_num))
@@ -195,11 +197,17 @@ class ProblemBoard:
       res = []
       for ib in params:
         problem = solve(ib)
-        if problem: res.append(problem)
+        if itr:
+          yield problem
+          if problem:
+            res.append(problem)
         if len(res) >= count: return ProblemBoard(board, res)
 
     print("FIND : ", len(res))
-    return ProblemBoard(board, res)
+    if itr:
+      print("END")
+    else:
+      return ProblemBoard(board, res)
 
   def len(self):
     return len(self.problems)
@@ -274,8 +282,65 @@ class ProblemSet:
             counts = counts.remove_list(prob.blocks)
             break
     return self.replace(res)
+
+  @staticmethod
+  def make3(setting):
+    block_count = setting.block_count
+    player = setting.player
+    puzzles = setting.puzzles
+    block_num = setting.block_num
+    cond_size = setting.board_nums
+
+    pre_search = 20
+    pre_req = 2
+
+    boards = []
+
+    for i in range(player):
+      print("PreSearch: ", i)
+      ok = False
+      while not ok:
+        c = 0
+        board = Board.random_board(2, setting.board_width, setting.board_height, choice(cond_size))
+        probb = ProblemBoard.make_from_board(board, block_count, block_num, rand=True, itr=True)
+        for _ in range(pre_search):
+          p = next(probb)
+          if p:
+            c += 1
+            ok = c >= pre_req
+          if c >= pre_req:
+            break
+      boards.append(board)
+      
+    res = [ProblemBoard(b, []) for b in boards]
+    ids = list(range(player))
+    for i in range(puzzles):
+      counts = block_count
+      print(counts.flat_counts())
+      ok = False
+      while not ok: 
+        shuffle(ids)
+        ok = True
+        r = [None for _ in range(player)]
+        for j in range(player):
+          print("Puzzle:", i, " FOR: ", j)
+          probs = ProblemBoard.make_from_board(boards[ids[i]], counts, block_num, rand=True, itr=True)
+          for prob in probs:
+            if prob: break
+          if not prob:
+            ok = False
+            print("Retry")
+            break
+          assert counts.is_include_list(prob.blocks)
+          r[ids[j]] = prob
+          counts = counts.remove_list(prob.blocks)
+        print("Puzzle:", i, "Satisfied")
+        for j in range(player):
+          res[ids[j]].append(r[ids[j]])
+
+    return ProblemSet(res)
     
-  def set_name(name):
+  def set_name(self, name):
     self.name = name
 
 class GameSetting:
@@ -298,10 +363,10 @@ class Game:
     res = []
     for i in range(setting.games):
       print("Making: ", i)
-      s = ProblemSet.make2(setting)
+      s = ProblemSet.make3(setting)
       PickleUtil.write("data/make2_"+str(i), s)
       res.append(s)
-    return GameSet(res)
+    return Game(res)
   
 def test_solver():
   alls = all_blocks()
@@ -350,15 +415,15 @@ def test_svg():
   problem = Problem(blocks, board)
   problem.print_ans()
 
-  probset = PickleUtil.read("data/4p4.a2")
+  probset = PickleUtil.read("data/make2_0")
   print(list(probb.len() for probb in probset.probboards))
   html = SVG.problemset(probset)
-  html.save("data/4p4.html")
+  html.save("data/make2.html")
 
   #probset.probboards[2].problems[0].print_ans()
 
 if __name__ == "__main__":
   #test_solver()
   #make2()
-  make_game()
+  #make_game()
   test_svg()
