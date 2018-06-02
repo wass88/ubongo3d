@@ -15,7 +15,7 @@ import datetime
 class Board:
   @staticmethod
   def from_2d(board, height = 2):
-    pass
+    return Board.from_3d(np.array([board] * height))
 
   @staticmethod
   def from_3d(board):
@@ -213,6 +213,7 @@ class ProblemBoard:
     return len(self.problems)
   
   def append(self, problem):
+    assert self.board == problem.board
     self.problems.append(problem)
 
   def extend(self, problemb):
@@ -232,59 +233,7 @@ class ProblemSet:
     return ProblemSet(probboards)
 
   @staticmethod
-  def make(block_count, player):
-    res = []
-    blockset = block_count.split_blocks(player)
-    for blocks in blockset:
-      while True:
-        cond_c = [20, 22, 24]
-        board = Board.random_board(2, 5, 4, choice(cond_c))
-        board.print()
-        problemb = ProblemBoard.make_from_board(board, blocks, 5)
-        if len(problemb.problems) >= 3:
-          problemb.print_one()
-          res.append(problemb)
-          break
-    return ProblemSet(res)
-
-  @staticmethod
-  def make2(setting):
-    block_count = setting.block_count
-    player = setting.player
-    puzzles = setting.puzzles
-    cond_size = setting.board_nums
-
-    probs = []
-
-    for i in range(player):
-      while True:
-        board = Board.random_board(2, setting.board_width, setting.board_height, choice(cond_size))
-        probb = ProblemBoard.make_from_board(board, block_count, 5, rand=True, para=True)
-        if probb.len() >= puzzles:
-          probs.append(probb)
-          PickleUtil.write("data/probb_" + datetime.datetime.now().isoformat(), probb)
-          break
-    return ProblemSet(probs).strict(block_count, puzzles)
-  
-  def strict(self, block_count, puzzles = 5):
-    probs = sorted(self.probboards, key = lambda p : p.len())
-
-    # TODO: need backtruck?
-    res = [ProblemBoard(p.board, []) for p in self.probboards]
-    for i in range(puzzles):
-      print(list(probb.len() for probb in probs))
-      counts = block_count
-      for ib, probb in enumerate(probs):
-        for ip, prob in enumerate(probb.problems):
-          if counts.is_include_list(prob.blocks):
-            res[ib].append(prob)
-            probs[ib].remove_index(ip)
-            counts = counts.remove_list(prob.blocks)
-            break
-    return self.replace(res)
-
-  @staticmethod
-  def make3(setting):
+  def make(setting):
     block_count = setting.block_count
     player = setting.player
     puzzles = setting.puzzles
@@ -295,7 +244,6 @@ class ProblemSet:
     pre_req = 2
 
     boards = []
-
     for i in range(player):
       print("PreSearch: ", i)
       ok = False
@@ -315,16 +263,15 @@ class ProblemSet:
     res = [ProblemBoard(b, []) for b in boards]
     ids = list(range(player))
     for i in range(puzzles):
-      counts = block_count
-      print(counts.flat_counts())
       ok = False
       while not ok: 
+        counts = block_count.clone()
         shuffle(ids)
         ok = True
         r = [None for _ in range(player)]
-        for j in range(player):
+        for j in ids:
           print("Puzzle:", i, " FOR: ", j)
-          probs = ProblemBoard.make_from_board(boards[ids[i]], counts, block_num, rand=True, itr=True)
+          probs = ProblemBoard.make_from_board(boards[j], counts, block_num, rand=True, itr=True)
           for prob in probs:
             if prob: break
           if not prob:
@@ -332,11 +279,11 @@ class ProblemSet:
             print("Retry")
             break
           assert counts.is_include_list(prob.blocks)
-          r[ids[j]] = prob
+          r[j] = prob
           counts = counts.remove_list(prob.blocks)
-        print("Puzzle:", i, "Satisfied")
-        for j in range(player):
-          res[ids[j]].append(r[ids[j]])
+      print("Puzzle:", i, "Satisfied")
+      for j in ids:
+        res[j].append(r[j])
 
     return ProblemSet(res)
     
@@ -363,7 +310,7 @@ class Game:
     res = []
     for i in range(setting.games):
       print("Making: ", i)
-      s = ProblemSet.make3(setting)
+      s = ProblemSet.make(setting)
       PickleUtil.write("data/make2_"+str(i), s)
       res.append(s)
     return Game(res)
@@ -381,18 +328,6 @@ def test_solver():
   prob = PickleUtil.read("data/sample5")
   prob.print_ans()
 
-  probset = ProblemSet.make(alls, 4)
-  PickleUtil.write("data/4p4.2", probset)
-  PickleUtil.read("data/4p4.2")
-
-def make2():
-  alls = all_blocks()
-  #probset = ProblemSet.make2(alls, 4)
-  PickleUtil.write("data/4p4.a", probset)
-
-  probset2 = probset.strict(alls)
-  PickleUtil.write("data/4p4.a2", probset2)
-
 def make_game():
   setting = GameSetting(
     block_count = all_blocks(),
@@ -404,26 +339,40 @@ def make_game():
     board_width = 5,
     board_height = 4
   )
-  game = Game.make(setting)
-  PickleUtil.write("data/game4player5block", game)
 
-def test_svg():
+  game = PickleUtil.read("data/game4player5block")
+  s = ProblemSet.make(setting)
+  game.probsets[1] = s
+  PickleUtil.write("data/game4player5block.2", game)
+  
+  #game = Game.make(setting)
+  #PickleUtil.write("data/game4player5block", game)
+
+def solving():
   alls = all_blocks()
-  board = Board.random_board(2, 2, 4, 16)
+  board = Board.from_2d((
+    [[1, 0, 1],
+     [1, 1, 1],
+     [1, 1, 0],
+     [1, 1, 1],
+     [0, 0, 1]
+    ]))
+  blocks = alls.get_blocklist().sublist(["YV", "RZ", "RZ", "YT", "RL"])
   board.print()
-  blocks = alls.get_blocklist().sublist(["BV", "BV", "BP", "BP"])
-  problem = Problem(blocks, board)
-  problem.print_ans()
+  problem = Problem(blocks,board)
 
-  probset = PickleUtil.read("data/make2_0")
-  print(list(probb.len() for probb in probset.probboards))
-  html = SVG.problemset(probset)
-  html.save("data/make2.html")
-
-  #probset.probboards[2].problems[0].print_ans()
-
+  html = SVG.html()
+  game = PickleUtil.read("data/game4player5block")
+  for probs in game.probsets:
+    html.append(SVG.problemset(probs))
+    for probb in probs.probboards:
+      for prob in probb.problems:
+        prob.print_ans()
+  html.save("data/game.html")
+    
 if __name__ == "__main__":
   #test_solver()
   #make2()
-  #make_game()
-  test_svg()
+ make_game()
+ # test_svg()
+ # solving()
