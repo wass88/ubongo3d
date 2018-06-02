@@ -162,6 +162,9 @@ class Problem:
     self.pre_place_blocks()
     self.place_blocks().print_one()
 
+  def same_block(self, other):
+    return sorted(self.blocks.names()) == sorted(other.blocks.names())
+
 def solve(data):
   (i, (blocks, board, block_count)) = data
   print(i,":",list(b.name for b in blocks.blocks))
@@ -219,11 +222,18 @@ class ProblemBoard:
   def extend(self, problemb):
     self.problems.extend(problemb.problems)
   
+  def is_include(self, problem):
+    return any(map(lambda p: p.same_block(problem),
+      self.problems))
+
   def remove_index(self, index):
     del self.problems[index]
   
   def print_one(self):
     self.problems[0].print_ans()
+  
+  def set_name(self, name):
+    self.name = name
 
 class ProblemSet:
   def __init__(self, probboards):
@@ -273,7 +283,13 @@ class ProblemSet:
           print("Puzzle:", i, " FOR: ", j)
           probs = ProblemBoard.make_from_board(boards[j], counts, block_num, rand=True, itr=True)
           for prob in probs:
-            if prob: break
+            if prob:
+              if res[j].is_include(prob):
+                print("Same Problem")
+                prob = None
+                continue
+              else:
+                break
           if not prob:
             ok = False
             print("Retry")
@@ -287,8 +303,9 @@ class ProblemSet:
 
     return ProblemSet(res)
     
-  def set_name(self, name):
-    self.name = name
+  def set_names(self, animal):
+    for i, probb in enumerate(self.probboards):
+      probb.name = animal + "-" + str(i)
 
 class GameSetting:
   def __init__(self, block_count, games, player, puzzles, block_num, board_nums, board_width, board_height):
@@ -314,6 +331,11 @@ class Game:
       PickleUtil.write("data/make2_"+str(i), s)
       res.append(s)
     return Game(res)
+
+  def set_names(self, animals):
+    for i, probset in enumerate(self.probsets):
+      probset.set_names(animals[i]+" "+str(i))
+
   
 def test_solver():
   alls = all_blocks()
@@ -361,18 +383,22 @@ def solving():
   board.print()
   problem = Problem(blocks,board)
 
-  html = SVG.html()
-  game = PickleUtil.read("data/game4player5block")
-  for probs in game.probsets:
-    html.append(SVG.problemset(probs))
-    for probb in probs.probboards:
-      for prob in probb.problems:
-        prob.print_ans()
+  game = PickleUtil.read("data/game4player5block.2")
+  animals = ["イグアナ",
+              "カメ",
+              "カメレオン",
+              "コブラ",
+              "コモドドラゴン",
+              "トカゲ",
+              "ヘビ",
+              "ヤモリ",
+              "アナコンダ",
+              "ワニ"]
+  game.set_names(animals)
+  html = SVG.game(game)
   html.save("data/game.html")
     
 if __name__ == "__main__":
   #test_solver()
-  #make2()
- make_game()
- # test_svg()
- # solving()
+  #make_game()
+  solving()

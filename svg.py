@@ -1,4 +1,6 @@
 from nputils import NpUtils
+from random import choice
+
 class SVG:
     def __init__(self, head, tail=""):
         self.head = head
@@ -6,7 +8,7 @@ class SVG:
         self.contents = []
     
     @staticmethod
-    def svg(width = 18, height = 10):
+    def svg(width = 21, height = 12):
         return SVG(
             '<svg xmlns="http://www.w3.org/2000/svg" version="1.1" \n'
                 'width="%fcm" height="%fcm">\n' % (width, height),
@@ -21,13 +23,16 @@ class SVG:
         """
         <style>
         .cont{ 
-            display: flex;
-            width: 40cm;
-            flex-wrap: wrap;
         }
-        .page {
+        .probset {
+            width: 50cm;
+            display: flex;
+            flex-wrap: wrap;
+            page-break-before: always;
+            page-break-after: always;
+        }
+        .prob {
             border: 1px solid black; 
-            margin: 2px;
         }
         </style>
         """
@@ -35,7 +40,7 @@ class SVG:
     
     @staticmethod
     def div(cls=""):
-        return SVG('<div cls="%s">' % cls, '</div>')
+        return SVG('<div class="%s">' % cls, '</div>')
 
     
     @staticmethod
@@ -74,16 +79,18 @@ class SVG:
             self.tail
         )
 
-    blocksize = 1.4
+    name_colors = {"G": "#00ff09", "Y": "#ffd500", "R": "#ff0000", "B": "#1e00ff"}
+    blocksize = 1.4 * (7.0 / 4.7)
     @staticmethod
     def board(board):
         size = SVG.blocksize
         res = SVG.g()
         bz = NpUtils.shirnk(board.board)[0]
+        colors = list(SVG.name_colors.values())
         for y, by in enumerate(reversed(bz)):
             for x, bx in enumerate(by):
                 if bx != 0:
-                    res.append(SVG.rect(y * size, x * size, size, size, fill="#ddd"))
+                    res.append(SVG.rect(y * size, x * size, size, size, fill="#ddd", stroke=choice(colors)))
         return res
     
     minisize = 0.2
@@ -94,16 +101,19 @@ class SVG:
         #res.append(SVG.text(0, -0.3, block.name))
         skewY = "skewY(45)"
         skewX = "skewX(45)"
-        name_color = {"G": "green", "Y": "yellow", "R": "red", "B": "blue"}
-        color = name_color[block.name[0]]
+        color = SVG.name_colors[block.name[0]]
+        stroke_width = 0.03
         for z, bz in enumerate(block.block):
             for y, by in enumerate((bz)):
                 for x, bx in enumerate(reversed(by)):
                     if bx != 0:
                         g = SVG.gtrans((y - 0.5 * z) * size, (x - 0.5 * z) * size)
-                        g.append(SVG.rect(size * 2, -size, size * 0.5, size, fill=color, transform=skewY))
-                        g.append(SVG.rect(-size, size * 2, size, size * 0.5, fill=color, transform=skewX))
-                        g.append(SVG.rect(size, size, size, size, fill=color))
+                        g.append(SVG.rect(size * 2, -size, size * 0.5, size,
+                                          fill=color, stroke_width=stroke_width, transform=skewY))
+                        g.append(SVG.rect(-size, size * 2, size, size * 0.5,
+                                          fill=color, stroke_width=stroke_width, transform=skewX))
+                        g.append(SVG.rect(size, size, size, size,
+                                          fill=color, stroke_width=stroke_width))
                         res.append(g)
         return res
     
@@ -123,7 +133,8 @@ class SVG:
         minisize = SVG.minisize
         res = SVG.gtrans(2,2)
         res.append(SVG.board(probs.board))
-        bl = SVG.gtrans(size * 7, 0)
+        res.append(SVG.text(0, -0.5, probs.name))
+        bl = SVG.gtrans(size * 6.5, 0)
         for i, prob in enumerate(probs.problems):
             g = SVG.gtrans(0, i * minisize * 8)
             g.append(SVG.text(-0.5, 0.5, str(i+1)))
@@ -134,13 +145,20 @@ class SVG:
     
     @staticmethod
     def problemset(probset):
-        html = SVG.html()
+        res = SVG.div("probset")
         for _, probb in enumerate(probset.probboards):
-            div = SVG.div("page")
+            div = SVG.div("prob")
             svg = SVG.svg()
             svg.append(SVG.problemboard(probb))
             div.append(svg)
-            html.append(div)
+            res.append(div)
+        return res
+
+    @staticmethod
+    def game(game):
+        html = SVG.html()
+        for probs in game.probsets:
+            html.append(SVG.problemset(probs))
         return html
 
     def save(self, f):
