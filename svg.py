@@ -131,6 +131,7 @@ class SVG:
     def problemboard(probs):
         size = SVG.blocksize
         minisize = SVG.minisize
+        svg = SVG.svg()
         res = SVG.gtrans(2,2)
         res.append(SVG.board(probs.board))
         res.append(SVG.text(0, -0.5, probs.name))
@@ -141,15 +142,15 @@ class SVG:
             g.append(SVG.blocklist(prob.blocks))
             bl.append(g)
         res.append(bl)
-        return res
+        svg.append(res)
+        return svg
     
     @staticmethod
     def problemset(probset):
         res = SVG.div("probset")
         for _, probb in enumerate(probset.probboards):
             div = SVG.div("prob")
-            svg = SVG.svg()
-            svg.append(SVG.problemboard(probb))
+            svg = SVG.problemboard(probb)
             div.append(svg)
             res.append(div)
         return res
@@ -159,6 +160,26 @@ class SVG:
         html = SVG.html()
         for probs in game.probsets:
             html.append(SVG.problemset(probs))
+        return html
+
+    @staticmethod
+    def game_tate(game):
+        html = SVG.html()
+        pss = [[] for _ in range(len(game.probsets[0].probboards))]
+        for probs in game.probsets:
+            for i, probb in enumerate(probs.probboards):
+                div = SVG.div("prob")
+                svg = SVG.problemboard(probb)
+                div.append(svg)
+                pss[i].append(svg)
+        for ps in pss:
+            div = SVG.div("probset")
+            for i, p in enumerate(ps):
+                if i != 0 and i % 4 == 0:
+                    html.append(div)
+                    div = SVG.div("probset")
+                div.append(p)
+            html.append(div)
         return html
 
     def save(self, f):

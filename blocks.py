@@ -141,6 +141,7 @@ class Comb:
                 dp[i + w] = dp[i + w] + [r]
     return (d for d in dp[target] if len(d) == count)
 
+  @staticmethod
   def comb_dup(count, cond):
     # cond: Dict[int -> List[(Block, num)]]
     dp = [[] for _ in range(count + 1)]
@@ -208,7 +209,7 @@ class BlockCount:
       counts[name] -= 1
       assert counts[name] >= 0
     return self.replace(counts)
-  
+
   def is_include_list(self, blocks):
     counts = dict(self.counts)
     print(counts)
@@ -216,6 +217,12 @@ class BlockCount:
       counts[name] -= 1
       if counts[name] < 0: return False
     return True
+
+  def uniq_block(self):
+    counts = dict(self.counts)
+    for n in counts.keys():
+      if counts[n] >= 1: counts[n] = 1
+    return self.replace(counts)
 
   @staticmethod
   def from_block_list(blocks):
@@ -229,27 +236,17 @@ class BlockCount:
       return [(self.blocks[name], self.counts[name]) for name, c in self.blockcounts.items() if c == count]
     self.countblocks = dict((count, countname(count)) for count in counts)
 
-  def remove_list(self, list):
-    counts = dict(self.counts)
-    for block in list.blocks:
-      counts[block.name] -= 1
-      assert self.counts[block.name] >= 0
-    return self.replace(counts)
-
   def all_comb_from_board(self, board, num):
-    from ubongo import BlockList
     res = Comb.all_comb(board.count(), num, self.countblocks)
     return map(BlockList, res)
   
   def get_blocklist(self):
-    from ubongo import BlockList
     return BlockList(self.blocks.values())
 
   def flat_counts(self):
     return sum( ([name] * num for name, num in self.counts.items()), [])
 
   def random_list(self, num):
-    from ubongo import BlockList
     names = sample(self.flat_counts(), num)
     return BlockList( self.blocks[name] for name in names )
 

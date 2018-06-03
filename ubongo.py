@@ -21,20 +21,73 @@ def test_solver():
   problem.print_ans()
 
 def make_game():
-  setting = GameSetting(
-    block_count = all_blocks(),
-    games = 1,
+  alls = all_blocks()
+  all_sub = alls.remove_list(alls.get_blocklist().sublist(["BV", "BV", "BV"]))
+  print(all_sub.counts)
+  block5depth2 = GameSetting(
+    block_count = all_sub,
+    games = 4,
     player = 4,
     puzzles = 5,
     block_num = 5,
+    block_uniq = True,
+    board_nums = [22, 24],
+    board_width = 5,
+    board_height = 4,
+    board_depth = 2
+  )
+  block5depth3 = GameSetting(
+    block_count = all_sub,
+    games = 4,
+    player = 4,
+    puzzles = 5,
+    block_num = 5,
+    block_uniq = True,
     board_nums = [21, 24],
     board_width = 5,
+    board_height = 3,
+    board_depth = 3
+  )
+  block6depth2 = GameSetting(
+    block_count = all_sub,
+    games = 1,
+    player = 4,
+    puzzles = 5,
+    block_num = 6,
+    block_uniq = True,
+    board_nums = [24, 26, 28],
+    board_width = 5,
+    board_height = 5,
+    board_depth = 2
+  )
+  block4depth3 = GameSetting(
+    block_count = all_sub,
+    games = 4,
+    player = 4,
+    puzzles = 5,
+    block_num = 4,
+    block_uniq = True,
+    board_nums = [18],
+    board_width = 3,
     board_height = 4,
     board_depth = 3
   )
 
-  s = ProblemSet.make(setting)
-  PickleUtil.write("data/game4player5block3depth", s)
+  s = Game.make(block4depth3)
+  PickleUtil.write("data/game4player4block3depthuniq", s)
+
+animals = {
+  "reptile": ["イグアナ", "カメ", "カメレオン", "コブラ", "コモドドラゴン",
+              "トカゲ", "ヘビ", "ヤモリ", "アナコンダ", "ワニ"],
+  "fish": ["トビウオ", "ハゼ", "コバンザメ", "アンコウ", "ミノカサゴ",
+           "ホウボウ", "マンボウ", "マグロ", "ウナギ", "エイ"],
+  "cute": ["モモンガ", "ヤマネコ", "ウサギ", "カモシカ", "サル",
+           "キツネ", "タヌキ", "クマ", "テン", "リス"],
+  "bug": ["カゲロウ", "トンボ", "ナナフシ", "バッタ", "カマキリ",
+          "カメムシ", "ヘビトンボ", "ノミ", "ハエ", "チョウ"],
+  "bird": ["カッコウ", "カモ", "キジ", "キツツキ",  "コウノトリ", 
+           "タカ", "ダチョウ", "チドリ", "ペリカン", "ペンギン"],
+}
 
 def solving():
   alls = all_blocks()
@@ -49,22 +102,12 @@ def solving():
   board.print()
   problem = Problem(blocks,board)
 
-  game = PickleUtil.read("data/game4player5block.2")
-  animals = ["イグアナ",
-              "カメ",
-              "カメレオン",
-              "コブラ",
-              "コモドドラゴン",
-              "トカゲ",
-              "ヘビ",
-              "ヤモリ",
-              "アナコンダ",
-              "ワニ"]
-  game.set_names(animals)
-  html = SVG.game(game)
-  html.save("data/game.html")
+  game = PickleUtil.read("data/game4player4block3depthuniq")
+  game.set_names(list(map(lambda n : "[3段] " + n, animals["fish"])))
+  html = SVG.game_tate(game)
+  html.save("data/game4.html")
     
 if __name__ == "__main__":
   #test_solver()
   make_game()
-  #solving()
+  solving()

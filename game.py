@@ -1,13 +1,14 @@
 from problem import Problem, ProblemBoard, ProblemSet
 
 class GameSetting:
-  def __init__(self, block_count, games, player, puzzles, block_num,
+  def __init__(self, block_count, games, player, puzzles, block_num, block_uniq,
                board_nums, board_width, board_height, board_depth):
     self.block_count = block_count
     self.games = games
     self.player = player
     self.puzzles = puzzles
     self.block_num = block_num
+    self.block_uniq = block_uniq
     self.board_nums = board_nums
     self.board_width = board_width
     self.board_height = board_height

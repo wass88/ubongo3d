@@ -179,17 +179,24 @@ class ProblemSet:
     block_num = setting.block_num
     cond_size = setting.board_nums
 
-    pre_search = 20
+    pre_search = 60
     pre_req = 2
 
     boards = []
+
+    def make_uniq(blockc):
+      if setting.block_uniq:
+        return blockc.uniq_block()
+      return blockc
+
     for i in range(player):
       print("PreSearch: ", i)
       ok = False
       while not ok:
         c = 0
-        board = Board.random_board(setting.board_depth, setting.board_width, setting.board_height, choice(cond_size))
-        probb = ProblemBoard.make_from_board(board, block_count, block_num, rand=True)
+        board = Board.random_board(setting.board_depth, setting.board_width,
+                                   setting.board_height, choice(cond_size))
+        probb = ProblemBoard.make_from_board(board, make_uniq(block_count), block_num, rand=True)
         for _ in range(pre_search):
           p = next(probb)
           if p:
@@ -210,7 +217,8 @@ class ProblemSet:
         r = [None for _ in range(player)]
         for j in ids:
           print("Puzzle:", i, " FOR: ", j)
-          probs = ProblemBoard.make_from_board(boards[j], counts, block_num, rand=True)
+          probs = ProblemBoard.make_from_board(boards[j], make_uniq(counts), block_num, rand=True)
+          prob = None
           for prob in probs:
             if prob:
               if res[j].is_include(prob):
